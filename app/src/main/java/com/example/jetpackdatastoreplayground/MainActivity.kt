@@ -1,8 +1,11 @@
 package com.example.jetpackdatastoreplayground
 
+import android.content.Context
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
+import android.widget.Button
 import android.widget.CheckBox
+import android.widget.TextView
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
@@ -25,6 +28,8 @@ class MainActivity : AppCompatActivity() {
     private val dataStore: DataStore<Preferences> =
             this.createDataStore(name = "userPrefs")
 
+    private var count: Int = 0
+
     private val userPreferencesFlow: Flow<DataStoreSettings.UserPreferences> = dataStore.data
             .catch { exception ->
                 // dataStore.data throws an IOException when an error is encountered when reading data
@@ -36,8 +41,9 @@ class MainActivity : AppCompatActivity() {
             }
             .map { preferences ->
                 // Get our show completed value, defaulting to false if not set:
-                val showCompleted = preferences[DataStoreSettings.PreferencesKeys.IS_CHECKED]?: false
-                DataStoreSettings.UserPreferences(showCompleted)
+                val isChecked = preferences[DataStoreSettings.PreferencesKeys.IS_CHECKED]?: false
+                val count = preferences[DataStoreSettings.PreferencesKeys.COUNT]?: 0
+                DataStoreSettings.UserPreferences(isChecked = isChecked, count = count)
             }
 
 
@@ -46,9 +52,13 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
 
         val checkBox = findViewById<CheckBox>(R.id.checkBox)
+        val button = findViewById<Button>(R.id.button)
+        val countText = findViewById<TextView>(R.id.textView)
 
         userPreferencesFlow.asLiveData().observe(this, {
             checkBox.isChecked = it.isChecked
+            count = it.count
+            countText.text = count.toString()
         })
 
         checkBox.setOnCheckedChangeListener { _, isChecked ->
@@ -56,11 +66,23 @@ class MainActivity : AppCompatActivity() {
                 updateIsChecked(isChecked)
             }
         }
+
+        button.setOnClickListener {
+            lifecycleScope.launch {
+                updateCount(count + 1)
+            }
+        }
     }
 
     private suspend fun updateIsChecked(isChecked: Boolean) {
         dataStore.edit { preferences ->
             preferences[DataStoreSettings.PreferencesKeys.IS_CHECKED] = isChecked
+        }
+    }
+
+    private suspend fun updateCount(newValue: Int) {
+        dataStore.edit { preferences ->
+            preferences[DataStoreSettings.PreferencesKeys.COUNT] = newValue
         }
     }
 }
