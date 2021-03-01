@@ -4,7 +4,7 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 
-object DataStoreSettings {
+object MyDataStore {
 
     object PreferencesKeys {
         val IS_CHECKED = booleanPreferencesKey("is_checked")
