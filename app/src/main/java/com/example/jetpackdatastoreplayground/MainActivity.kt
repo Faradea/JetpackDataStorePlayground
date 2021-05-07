@@ -1,46 +1,24 @@
 package com.example.jetpackdatastoreplayground
 
+import android.content.Context
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.widget.Button
 import android.widget.CheckBox
 import android.widget.TextView
 import androidx.datastore.core.DataStore
-import androidx.datastore.preferences.core.Preferences
-import androidx.datastore.preferences.core.edit
-import androidx.datastore.preferences.core.emptyPreferences
-import androidx.datastore.preferences.createDataStore
 import androidx.lifecycle.asLiveData
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.observe
+import com.example.jetpackdatastoreplayground.proto.UserPreferencesSerializer
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
-import java.io.IOException
+import androidx.datastore.dataStore
 
 class MainActivity : AppCompatActivity() {
 
-    private val dataStore: DataStore<Preferences> =
-            this.createDataStore(name = "userPrefs")
-
     private var count: Int = 0
-
-    private val userPreferencesFlow: Flow<MyDataStore.UserPreferences> = dataStore.data
-            .catch { exception ->
-                // dataStore.data throws an IOException when an error is encountered when reading data
-                if (exception is IOException) {
-                    emit(emptyPreferences())
-                } else {
-                    throw exception
-                }
-            }
-            .map { preferences ->
-                // Get our show completed value, defaulting to false if not set:
-                val isChecked = preferences[MyDataStore.PreferencesKeys.IS_CHECKED]?: false
-                val count = preferences[MyDataStore.PreferencesKeys.COUNT]?: 0
-                MyDataStore.UserPreferences(isChecked = isChecked, count = count)
-            }
-
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -50,34 +28,28 @@ class MainActivity : AppCompatActivity() {
         val button = findViewById<Button>(R.id.button)
         val countText = findViewById<TextView>(R.id.textView)
 
-        userPreferencesFlow.asLiveData().observe(this, {
-            checkBox.isChecked = it.isChecked
-            count = it.count
-            countText.text = count.toString()
-        })
+        val protoIsCheckedFlow: Flow<Boolean> = this.applicationContext.protoDataStore.data
+            .map { it.isCheckedProto }
+
+        protoIsCheckedFlow.asLiveData().observe(this) {
+            checkBox.isChecked = it
+        }
+
 
         checkBox.setOnCheckedChangeListener { _, isChecked ->
             lifecycleScope.launch {
-                updateIsChecked(isChecked)
+                protoDataStore.updateData { currentUserPreferences ->
+                    currentUserPreferences
+                        .toBuilder()
+                        .setIsCheckedProto(isChecked)
+                        .build()
+                }
             }
-        }
-
-        button.setOnClickListener {
-            lifecycleScope.launch {
-                updateCount(count + 1)
-            }
-        }
-    }
-
-    private suspend fun updateIsChecked(isChecked: Boolean) {
-        dataStore.edit { preferences ->
-            preferences[MyDataStore.PreferencesKeys.IS_CHECKED] = isChecked
-        }
-    }
-
-    private suspend fun updateCount(newValue: Int) {
-        dataStore.edit { preferences ->
-            preferences[MyDataStore.PreferencesKeys.COUNT] = newValue
         }
     }
 }
+
+private val Context.protoDataStore: DataStore<UserPreferences> by dataStore(
+    fileName = "user_preferences.pb",
+    serializer = UserPreferencesSerializer,
+)
