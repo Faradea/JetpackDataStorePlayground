@@ -31,10 +31,17 @@ class MainActivity : AppCompatActivity() {
         val protoIsCheckedFlow: Flow<Boolean> = this.applicationContext.protoDataStore.data
             .map { it.isCheckedProto }
 
+        val protoCountFlow: Flow<Int> = this.applicationContext.protoDataStore.data
+                .map { it.count }
+
         protoIsCheckedFlow.asLiveData().observe(this) {
             checkBox.isChecked = it
         }
 
+        protoCountFlow.asLiveData().observe(this) {
+            count = it
+            countText.text = it.toString()
+        }
 
         checkBox.setOnCheckedChangeListener { _, isChecked ->
             lifecycleScope.launch {
@@ -46,10 +53,22 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
+
+        button.setOnClickListener {
+            count++
+            lifecycleScope.launch {
+                protoDataStore.updateData { currentUserPreferences ->
+                    currentUserPreferences
+                            .toBuilder()
+                            .setCount(count)
+                            .build()
+                }
+            }
+        }
     }
 }
 
 private val Context.protoDataStore: DataStore<UserPreferences> by dataStore(
-    fileName = "user_preferences.pb",
-    serializer = UserPreferencesSerializer,
+        fileName = "user_preferences.pb",
+        serializer = UserPreferencesSerializer,
 )
